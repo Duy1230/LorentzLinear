@@ -1,0 +1,7 @@
+torch>=2.1
+numpy
+matplotlib
+seaborn
+pyyaml
+scipy
+pytest>=7.0

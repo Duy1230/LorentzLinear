@@ -1,0 +1,38 @@
+# Tier 1 -- Kernel & Approximation Validation
+# All experiments use these shared defaults unless overridden.
+
+shared:
+  beta: 1.0
+  seed: 0
+  dtype: float64
+
+exp1_kernel_approx:
+  N: 1000
+  dims: [16, 64, 256]
+  curvatures: [-1.0, -0.1]
+  R_values: [1, 2, 3, 4]
+  M_values: [32, 64, 128, 256, 512]
+  n_seeds: 30
+
+exp2_normalizer_health:
+  N: 500
+  d: 16
+  K: -1.0
+  R_values: [1, 2, 3, 4]
+  M_values: [32, 64, 128, 256, 512]
+  eps_reg: 1.0e-4
+
+exp3_attention_error:
+  N: 200
+  d: 16
+  K: -1.0
+  R_values: [1, 2, 3, 4]
+  M_values: [32, 64, 128, 256, 512]
+
+exp4_equivariance:
+  N: 100
+  d: 16
+  K: -1.0
+  R: 2
+  M: 64
+  rapidities: [0.1, 0.3, 0.5, 0.7, 0.9]
