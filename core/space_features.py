@@ -49,7 +49,7 @@ class SpaceFeatureMap(nn.Module):
         xs_norm_sq = (xs * xs).sum(dim=-1, keepdim=True)  # (..., 1)
 
         # log(phi_j) = -||xs||^2/2 + omega_j^T xs
-        log_phi = -xs_norm_sq / 2.0 + proj
+        log_phi = -self.beta * xs_norm_sq / 2.0 + proj
 
         # Subtract the global max across all samples AND features in this
         # call.  Because it is a single scalar, it factors out of every
