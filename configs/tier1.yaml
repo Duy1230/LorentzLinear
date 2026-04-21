@@ -13,6 +13,7 @@ exp1_kernel_approx:
   R_values: [1, 2, 3, 4]
   M_values: [32, 64, 128, 256, 512]
   n_seeds: 30
+  run_orf: true
 
 exp2_normalizer_health:
   N: 500
@@ -28,6 +29,7 @@ exp3_attention_error:
   K: -1.0
   R_values: [1, 2, 3, 4]
   M_values: [32, 64, 128, 256, 512]
+  run_orf: true
 
 exp4_equivariance:
   N: 100
@@ -36,3 +38,19 @@ exp4_equivariance:
   R: 2
   M: 64
   rapidities: [0.1, 0.3, 0.5, 0.7, 0.9]
+
+exp4b_prop4_validation:
+  N: 100
+  d: 16
+  K: -1.0
+  R: 2
+  M: 64
+  rapidities: [0.1, 0.3, 0.5, 0.7, 0.9]
+  n_seeds: 10
+
+exp5_degenerate_analysis:
+  N: 1000
+  d: 16
+  K: -1.0
+  R: 2
+  M: 64

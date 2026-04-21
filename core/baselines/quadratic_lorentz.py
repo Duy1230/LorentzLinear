@@ -30,7 +30,11 @@ class QuadraticLorentzAttention(nn.Module):
         Returns:
             Output projected onto the hyperboloid, (..., N, d_v).
         """
-        # Pairwise Minkowski inner products — (..., N_q, N_k)
+        y = self.forward_raw(Q, K_in, V, causal=causal)
+        return project_to_hyperboloid(y, self.K)
+
+    def forward_raw(self, Q: Tensor, K_in: Tensor, V: Tensor, causal: bool = False) -> Tensor:
+        """Compute pre-projection attention output (before hyperboloid projection)."""
         scores = torch.einsum("...id,...jd->...ij", Q[..., 1:], K_in[..., 1:]) \
                - torch.einsum("...i,...j->...ij", Q[..., 0], K_in[..., 0])
         scores = scores * self.beta
@@ -41,8 +45,7 @@ class QuadraticLorentzAttention(nn.Module):
             scores = scores.masked_fill(mask, float("-inf"))
 
         weights = torch.softmax(scores, dim=-1)  # (..., N_q, N_k)
-        y = torch.einsum("...ij,...jd->...id", weights, V)
-        return project_to_hyperboloid(y, self.K)
+        return torch.einsum("...ij,...jd->...id", weights, V)
 
     def attention_weights(self, Q: Tensor, K_in: Tensor) -> Tensor:
         """Return the raw softmax attention weights (for diagnostics)."""

@@ -45,6 +45,7 @@ class LorentzLinearAttention(nn.Module):
         K: float = -1.0,
         eps_reg: float = 1e-4,
         seed: int = 42,
+        use_orf: bool = False,
     ):
         super().__init__()
         self.d = d
@@ -55,7 +56,7 @@ class LorentzLinearAttention(nn.Module):
         self.eps_reg = eps_reg
 
         self.krein = KreinSplit(R, beta)
-        self.space = SpaceFeatureMap(d, M, beta, seed=seed)
+        self.space = SpaceFeatureMap(d, M, beta, seed=seed, use_orf=use_orf)
 
     # ------------------------------------------------------------------
     # Feature computation
@@ -105,12 +106,16 @@ class LorentzLinearAttention(nn.Module):
         return self._forward_full(Q, K, V)
 
     def _forward_full(self, Q: Tensor, K_in: Tensor, V: Tensor) -> Tensor:
+        y = self._forward_full_raw(Q, K_in, V)
+        return project_to_hyperboloid(y, self.K)
+
+    def _forward_full_raw(self, Q: Tensor, K_in: Tensor, V: Tensor) -> Tensor:
+        """Compute pre-projection attention output (before hyperboloid projection)."""
         Q_p = self.feat(Q, "+")   # (..., N, F)
         Q_m = self.feat(Q, "-")
         K_p = self.feat(K_in, "+")
         K_m = self.feat(K_in, "-")
 
-        # Accumulate KV statistics — einsum handles arbitrary batch dims
         S_p = torch.einsum("...ni,...nj->...ij", K_p, V)  # (..., F, d_v)
         S_m = torch.einsum("...ni,...nj->...ij", K_m, V)
         z_p = K_p.sum(dim=-2)  # (..., F)
@@ -122,9 +127,7 @@ class LorentzLinearAttention(nn.Module):
               - torch.einsum("...ni,...i->...n", Q_m, z_m)     # (..., N)
 
         inv = self._stable_inv(S_hat)  # (..., N)
-        y = N_hat * inv.unsqueeze(-1)
-
-        return project_to_hyperboloid(y, self.K)
+        return N_hat * inv.unsqueeze(-1)
 
     def _forward_causal(self, Q: Tensor, K_in: Tensor, V: Tensor) -> Tensor:
         """Autoregressive variant with running-sum recurrence."""

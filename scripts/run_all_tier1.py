@@ -21,6 +21,8 @@ from experiments.kernel_validation import (
     exp2_normalizer_health,
     exp3_attention_error,
     exp4_equivariance,
+    exp4b_prop4_validation,
+    exp5_degenerate_analysis,
 )
 
 
@@ -39,6 +41,8 @@ def main():
         ("Exp 1.2: Normaliser Health",            exp2_normalizer_health, "exp2_normalizer_health"),
         ("Exp 1.3: Attention Output Error",       exp3_attention_error, "exp3_attention_error"),
         ("Exp 1.4: Equivariance Under Boosts",    exp4_equivariance, "exp4_equivariance"),
+        ("Exp 4b: Proposition 4 Validation",      exp4b_prop4_validation, "exp4b_prop4_validation"),
+        ("Exp 5:  Degenerate Output Analysis",    exp5_degenerate_analysis, "exp5_degenerate_analysis"),
     ]
 
     for title, module, key in experiments:

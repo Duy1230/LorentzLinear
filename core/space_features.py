@@ -25,16 +25,48 @@ from torch import Tensor
 class SpaceFeatureMap(nn.Module):
     """Performer-style positive random features for exp(beta * qs^T ks)."""
 
-    def __init__(self, d_space: int, M: int, beta: float = 1.0, seed: int = 42):
+    def __init__(
+        self,
+        d_space: int,
+        M: int,
+        beta: float = 1.0,
+        seed: int = 42,
+        use_orf: bool = False,
+    ):
         super().__init__()
         self.d_space = d_space
         self.M = M
         self.beta = beta
+        self.use_orf = use_orf
         self._log_scale: Tensor | None = None
 
         gen = torch.Generator().manual_seed(seed)
-        omega = torch.randn(M, d_space, generator=gen) * math.sqrt(beta)
+        if use_orf:
+            omega = self._build_orf_omega(M, d_space, beta, gen)
+        else:
+            omega = torch.randn(M, d_space, generator=gen) * math.sqrt(beta)
         self.register_buffer("omega", omega)  # (M, d_space), fixed
+
+    @staticmethod
+    def _build_orf_omega(
+        M: int, d: int, beta: float, gen: torch.Generator,
+    ) -> Tensor:
+        """Construct ORF projection matrix via QR of Gaussian blocks.
+
+        Each d x d Gaussian block is QR-decomposed to yield a uniformly random
+        orthogonal matrix Q, then each row is rescaled by the chi-distributed
+        norm of the original Gaussian row (preserving the expected row-norm
+        distribution).  Multiple blocks are stacked when M > d.
+        """
+        n_blocks = math.ceil(M / d)
+        blocks: list[Tensor] = []
+        for _ in range(n_blocks):
+            G = torch.randn(d, d, generator=gen)
+            norms = G.norm(dim=1, keepdim=True)  # chi-distributed
+            Q, _ = torch.linalg.qr(G)
+            blocks.append(Q * norms)
+        omega = torch.cat(blocks, dim=0)[:M] * math.sqrt(beta)
+        return omega
 
     def forward(self, xs: Tensor) -> Tensor:
         """Compute phi_E(xs).
