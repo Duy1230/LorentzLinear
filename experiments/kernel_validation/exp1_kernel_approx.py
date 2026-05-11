@@ -41,9 +41,11 @@ def _build_orf_omega(M: int, d: int, beta: float, gen: torch.Generator,
     blocks = []
     for _ in range(n_blocks):
         G = torch.randn(d, d, dtype=dtype, device=device, generator=gen)
-        norms = G.norm(dim=1, keepdim=True)
-        Q, _ = torch.linalg.qr(G)
-        blocks.append(Q * norms)
+        Q, R = torch.linalg.qr(G)
+        signs = R.diagonal().sign()
+        Q = Q * signs.unsqueeze(0)
+        chi_norms = torch.randn(d, d, dtype=dtype, device=device, generator=gen).norm(dim=1, keepdim=True)
+        blocks.append(Q * chi_norms)
     return torch.cat(blocks, dim=0)[:M] * math.sqrt(beta)
 
 
