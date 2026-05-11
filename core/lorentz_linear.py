@@ -112,8 +112,10 @@ class LorentzLinearAttention(nn.Module):
     def _forward_full_raw(self, Q: Tensor, K_in: Tensor, V: Tensor) -> Tensor:
         """Compute pre-projection attention output (before hyperboloid projection)."""
         Q_p = self.feat(Q, "+")   # (..., N, F)
+        h_Q = self.space.log_scale.clone()
         Q_m = self.feat(Q, "-")
         K_p = self.feat(K_in, "+")
+        h_K = self.space.log_scale.clone()
         K_m = self.feat(K_in, "-")
 
         S_p = torch.einsum("...ni,...nj->...ij", K_p, V)  # (..., F, d_v)
@@ -126,8 +128,14 @@ class LorentzLinearAttention(nn.Module):
         S_hat = torch.einsum("...ni,...i->...n", Q_p, z_p) \
               - torch.einsum("...ni,...i->...n", Q_m, z_m)     # (..., N)
 
-        inv = self._stable_inv(S_hat)  # (..., N)
-        return N_hat * inv.unsqueeze(-1)
+        # The overflow guard in SpaceFeatureMap subtracts a shared max h from
+        # all log-features, multiplying every feature by exp(-h).  Both N_hat
+        # and S_hat carry factor exp(-h_Q - h_K) which cancels in the ratio,
+        # but only if _stable_inv doesn't clip S_hat first.  Undo the
+        # suppression so _stable_inv sees the true normaliser magnitude.
+        scale = torch.exp(h_Q + h_K)
+        inv = self._stable_inv(S_hat * scale)  # (..., N)
+        return (N_hat * scale) * inv.unsqueeze(-1)
 
     def _forward_causal(self, Q: Tensor, K_in: Tensor, V: Tensor) -> Tensor:
         """Autoregressive variant with running-sum recurrence."""
@@ -141,10 +149,14 @@ class LorentzLinearAttention(nn.Module):
         d_v = V.shape[-1]
 
         Q_p = self.feat(Q, "+")  # (B, N, F)
+        h_Q = self.space.log_scale.clone()
         Q_m = self.feat(Q, "-")
         K_p = self.feat(K_in, "+")
+        h_K = self.space.log_scale.clone()
         K_m = self.feat(K_in, "-")
         F = Q_p.shape[-1]
+
+        scale = torch.exp(h_Q + h_K)
 
         S_p = Q.new_zeros(B, F, d_v)
         S_m = Q.new_zeros(B, F, d_v)
@@ -169,8 +181,8 @@ class LorentzLinearAttention(nn.Module):
                   - torch.einsum("bi,bij->bj", qm_t, S_m)
             s_hat = (qp_t * z_p).sum(-1) - (qm_t * z_m).sum(-1)  # (B,)
 
-            inv = self._stable_inv(s_hat)
-            y_t = n_hat * inv.unsqueeze(-1)
+            inv = self._stable_inv(s_hat * scale)
+            y_t = (n_hat * scale) * inv.unsqueeze(-1)
             outputs.append(y_t)
 
         y = torch.stack(outputs, dim=1)  # (B, N, d_v)

@@ -53,18 +53,23 @@ class SpaceFeatureMap(nn.Module):
     ) -> Tensor:
         """Construct ORF projection matrix via QR of Gaussian blocks.
 
-        Each d x d Gaussian block is QR-decomposed to yield a uniformly random
-        orthogonal matrix Q, then each row is rescaled by the chi-distributed
-        norm of the original Gaussian row (preserving the expected row-norm
-        distribution).  Multiple blocks are stacked when M > d.
+        Following the FAVOR+ construction (Choromanski et al., 2021):
+        1. QR-decompose a Gaussian matrix to obtain a Haar-uniform Q.
+        2. Multiply columns of Q by sign(diag(R)) to ensure Haar uniformity.
+        3. Scale each row by an *independent* chi(d) norm drawn from a
+           separate Gaussian matrix (the norms must be independent of Q to
+           preserve the correct marginal distribution).
+        Multiple blocks are stacked independently when M > d.
         """
         n_blocks = math.ceil(M / d)
         blocks: list[Tensor] = []
         for _ in range(n_blocks):
             G = torch.randn(d, d, generator=gen)
-            norms = G.norm(dim=1, keepdim=True)  # chi-distributed
-            Q, _ = torch.linalg.qr(G)
-            blocks.append(Q * norms)
+            Q, R = torch.linalg.qr(G)
+            signs = R.diagonal().sign()
+            Q = Q * signs.unsqueeze(0)
+            chi_norms = torch.randn(d, d, generator=gen).norm(dim=1, keepdim=True)
+            blocks.append(Q * chi_norms)
         omega = torch.cat(blocks, dim=0)[:M] * math.sqrt(beta)
         return omega
 
